@@ -11,7 +11,7 @@ import LiveConsole from './dashboard/LiveConsole'
  * Auth Token: LEetF1FDQbcR7A5pAR9Hlbb1i-ijz5xc
  * Template: hybrid BMS
  */
-const BLYNK_AUTH_TOKEN = "LEetF1FDQbcR7A5pAR9Hlbb1i-ijz5xc"; 
+const BLYNK_AUTH_TOKEN = process.env.NEXT_PUBLIC_BLYNK_TOKEN;
 const BLYNK_API_URL = `https://blynk.cloud/external/api/get?token=${BLYNK_AUTH_TOKEN}`;
 
 export default function Dashboard() {
