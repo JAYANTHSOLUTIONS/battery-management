@@ -12,24 +12,27 @@ interface LiveMetricsProps {
 
 export default function LiveMetrics({ voltage, current, temperature, soc }: LiveMetricsProps) {
   
-  // Define individual hardware safety thresholds
+  /**
+   * BUG FIX: getStatus now receives raw numbers for accurate comparison.
+   * Logic mapped to ESP32 safety thresholds
+   */
   const getStatus = (label: string, val: number) => {
     switch (label) {
       case 'Voltage':
-        if (val > 12.6 || val < 9.0) return 'critical'; // Over/Under voltage
-        if (val > 12.4 || val < 9.5) return 'warning';
+        if (val > 12.6 || (val < 9.0 && val > 0)) return 'critical'; 
+        if (val > 12.4 || (val < 9.5 && val > 0)) return 'warning';
         return 'normal';
       case 'Current':
-        if (val > 2.5) return 'critical'; // MAX_CHARGE_A limit
+        if (val > 2.5) return 'critical'; 
         if (val > 2.0) return 'warning';
         return 'normal';
       case 'Temperature':
-        if (val >= 50.0) return 'critical'; // MAX_TEMP_C limit
+        if (val >= 50.0) return 'critical'; 
         if (val >= 45.0) return 'warning';
         return 'normal';
       case 'Charge':
-        if (val < 15) return 'critical';
-        if (val < 25) return 'warning';
+        if (val < 15 && val > 0) return 'critical';
+        if (val < 25 && val > 0) return 'warning';
         return 'normal';
       default:
         return 'normal';
@@ -37,50 +40,61 @@ export default function LiveMetrics({ voltage, current, temperature, soc }: Live
   }
 
   const getColor = (status: string, defaultColor: string) => {
-    if (status === 'critical') return '#ef4444'; // Bright Red
-    if (status === 'warning') return '#f59e0b';  // Amber/Orange
+    if (status === 'critical') return '#ef4444'; // Tech Red
+    if (status === 'warning') return '#f59e0b';  // Warning Amber
     return defaultColor;
   }
 
+  // UI CONFIG: Expanded sizes and non-standard colors (Orange, Purple, Cyan, Pink)
   const metrics = [
-    { label: 'Voltage', val: voltage.toFixed(2), unit: 'V', icon: <Zap />, baseColor: '#ff9800' },
-    { label: 'Current', val: current.toFixed(2), unit: 'A', icon: <Activity />, baseColor: '#9c27b0' },
-    { label: 'Temperature', val: temperature.toFixed(1), unit: '°C', icon: <Thermometer />, baseColor: '#3b82f6' },
-    { label: 'Charge', val: soc, unit: '%', icon: <Battery />, baseColor: '#00bcd4' },
-    { label: 'Health', val: '98', unit: '%', icon: <HeartPulse />, baseColor: '#e91e63' }
+    { label: 'Voltage', val: voltage || 0, unit: 'V', icon: <Zap />, baseColor: '#ff9800', decimals: 2 },
+    { label: 'Current', val: current || 0, unit: 'A', icon: <Activity />, baseColor: '#9c27b0', decimals: 2 },
+    { label: 'Temperature', val: temperature || 0, unit: '°C', icon: <Thermometer />, baseColor: '#ffeb3b', decimals: 1 },
+    { label: 'Charge', val: soc || 0, unit: '%', icon: <Battery />, baseColor: '#00bcd4', decimals: 0 },
+    { label: 'Health', val: 98, unit: '%', icon: <HeartPulse />, baseColor: '#e91e63', decimals: 0 }
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mb-10">
       {metrics.map((m, i) => {
-        const status = getStatus(m.label, parseFloat(m.val.toString()));
+        const status = getStatus(m.label, m.val);
         const activeColor = getColor(status, m.baseColor);
         const isAlert = status !== 'normal';
+        const displayVal = m.val.toFixed(m.decimals);
 
         return (
           <motion.div
             key={i}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ 
-              borderColor: isAlert ? activeColor : '#f3f4f6',
-              scale: status === 'critical' ? [1, 1.02, 1] : 1
+              opacity: 1, 
+              y: 0,
+              borderColor: isAlert ? activeColor : '#ffffff',
+              scale: status === 'critical' ? [1, 1.03, 1] : 1
             }}
-            transition={{ repeat: status === 'critical' ? Infinity : 0, duration: 1 }}
-            className="bg-white p-8 rounded-[2.5rem] shadow-xl border-4 relative overflow-hidden group transition-all duration-500"
+            transition={{ 
+              delay: i * 0.1,
+              scale: { repeat: status === 'critical' ? Infinity : 0, duration: 1.5 }
+            }}
+            // LARGER CARDS: p-10 (extra padding) and rounded-[3rem]
+            className="bg-white p-10 rounded-[3rem] shadow-2xl border-4 relative overflow-hidden group transition-all duration-700"
           >
-            {/* Warning Background Glow */}
+            {/* Dynamic Alert Glow */}
             {isAlert && (
-              <div 
-                className="absolute inset-0 opacity-10 animate-pulse" 
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.15 }}
+                className="absolute inset-0 pointer-events-none animate-pulse" 
                 style={{ backgroundColor: activeColor }}
               />
             )}
 
-            <div className="flex items-center justify-between mb-8 relative z-10">
+            <div className="flex items-center justify-between mb-10 relative z-10">
               <div 
                 style={{ color: activeColor, backgroundColor: `${activeColor}15` }} 
-                className="p-4 rounded-2xl transition-colors duration-500"
+                className="p-5 rounded-3xl transition-colors duration-500 scale-125"
               >
-                {status === 'critical' ? <ShieldAlert size={28} /> : m.icon}
+                {status === 'critical' ? <ShieldAlert size={32} /> : m.icon}
               </div>
               
               {isAlert && (
@@ -89,41 +103,41 @@ export default function LiveMetrics({ voltage, current, temperature, soc }: Live
                   animate={{ opacity: 1, scale: 1 }}
                   style={{ color: activeColor }}
                 >
-                  <AlertTriangle size={24} className="animate-bounce" />
+                  <AlertTriangle size={32} className="animate-bounce" />
                 </motion.div>
               )}
             </div>
 
             <div className="relative z-10">
-              <p className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-1">
-                {m.label} {isAlert && `- ${status.toUpperCase()}`}
+              <p className="text-sm font-black text-gray-400 uppercase tracking-[0.3em] mb-2">
+                {m.label}
               </p>
               
-              <div className="flex items-baseline gap-1">
+              <div className="flex items-baseline gap-2">
                 <AnimatePresence mode="wait">
                   <motion.span
-                    key={m.val}
-                    initial={{ opacity: 0, y: 10 }}
+                    key={displayVal}
+                    initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     style={{ color: activeColor }}
-                    className="text-5xl font-black transition-colors duration-500"
+                    className="text-6xl font-black tracking-tighter transition-colors duration-500"
                   >
-                    {m.val}
+                    {displayVal}
                   </motion.span>
                 </AnimatePresence>
-                <span className="text-lg font-bold text-gray-400">{m.unit}</span>
+                <span className="text-xl font-bold text-gray-300">{m.unit}</span>
               </div>
 
-              {/* Dynamic Progress Bar */}
-              <div className="mt-6 w-full bg-gray-100 h-3 rounded-full overflow-hidden">
+              {/* THICKER PROGRESS BAR: h-4 */}
+              <div className="mt-8 w-full bg-gray-100 h-4 rounded-full overflow-hidden shadow-inner">
                  <motion.div 
-                   className="h-full transition-colors duration-500" 
+                   className="h-full transition-all duration-1000 ease-out" 
                    style={{ 
                      backgroundColor: activeColor,
-                     width: m.label === 'Charge' ? `${soc}%` : '70%' 
+                     width: m.label === 'Charge' ? `${m.val}%` : '80%' 
                    }}
                    initial={{ width: 0 }}
-                   animate={{ width: m.label === 'Charge' ? `${soc}%` : '70%' }}
+                   animate={{ width: m.label === 'Charge' ? `${m.val}%` : '80%' }}
                  />
               </div>
             </div>
